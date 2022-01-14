@@ -1,38 +1,18 @@
+<!DOCTYPE html>
 <html>
   <head>
-    <title>Basic Scene - A-Frame</title>
-    <meta name="description" content="Basic Scene - A-Frame">
-    <script src="https://aframe.io/releases/0.5.0/aframe.min.js"></script>
+  	<meta charset="utf-8">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css"
+   integrity="sha512-xodZBNTC5n17Xt2atTPuE1HxjVMSvLVW9ocqUKLsCC5CXdbqCmblAshOMAS6/keqq/sMZMZ19scR4PsZChSR7A=="
+   crossorigin=""/>
+    <link rel="stylesheet" href="style.css" />
   </head>
-  <body
-        <h1>Exercice2</h1>
-   <div> <a-scene>
-      <a-assets>
-      
-        <img id="groundTexture" src="http://wall.cookdiary.net/sites/default/files/wallpaper/man-made/70439/great-pyramid-giza-wallpapers-hd-70439-6223922.png">
-        <img id="skyTexture" src="https://wallpapercave.com/wp/GrXAVLL.jpg" crossorigin="anonymous">
-      </a-assets>
-              <a-assets>
-    <a-asset-item id="skull-model" src="https://dl.dropboxusercontent.com/s/dvahjq5trg9pysj/evil-skull.gltf" crossorigin="anonymous"></a-asset-item> 
-  </a-assets>
-     
-   
-     
-      
-      
-      <a-sky height="2048" radius="20" src="https://d2v9y0dukr6mq2.cloudfront.net/video/thumbnail/UD7CEz6/egyptian-pyramids-with-vivid-color_7ypakyqv__F0000.png"  width="2048"  crossorigin="anonymous"></a-sky>
-      <a-light  color="#F0E68C"></a-light>
-      <a-light type="point" color="#F0E68C" intensity="2" position="2 4 4"></a-light>
-      <a-plane src="#groundTexture" rotation="-90 0 0" height="100" width="100">
-    
-      </a-plane>
-      <a-text value="Hello, Vestri!" color="#BBB" position="-0.9 0.2 -3" scale="1.5 1.5 1.5"></a-text>
-      
-      <a-camera>
-        <a-cursor color="#FAFAFA"></a-cursor>
-      </a-camera>
-    </a-scene>
-     </div>
-
+  <body>
+    <div id="leaflet"></div>
+    <!-- Make sure you put this AFTER Leaflet's CSS -->
+ <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"
+   integrity="sha512-XQoYMqMTK8LvdxXYG3nZ448hOEQiglfqkJs1NOQV44cWnUrBc8PkAOcXy20w0vlaXaVUearIOBhiXZ5V3ynxwA=="
+   crossorigin=""></script>
+    <script type="text/javascript" src="script.js"></script>
   </body>
 </html>
