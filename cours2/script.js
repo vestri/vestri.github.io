@@ -40,7 +40,7 @@ oReq.send();
 
 
 let xhr = new XMLHttpRequest(); 
-xhr.open("GET", "http://opendata.nicecotedazur.org/data/storage/f/2021-06-24T07%3A47%3A53.464Z/bornes-rm-a8.geojson"); 
+xhr.open("GET", "https://opendata.nicecotedazur.org/data/storage/f/2021-06-24T07%3A47%3A53.464Z/bornes-rm-a8.geojson"); 
 xhr.setRequestHeader("Content-Type", "application/json");
 xhr.responseType = "json";
 xhr.onload = function() { if (xhr.status !== 200) return L.geoJSON(xhr.response).addTo(map); };
