@@ -19,6 +19,16 @@
     }
     </style>
     <script type="text/javascript">
+// First, get the Feature Policy object
+const featurePolicy = document.featurePolicy
+ // Then query feature for specific
+const allowed = featurePolicy.allowsFeature("geolocation")
+
+if (allowed){
+  console.log("FP allows geolocation.")
+} else {
+  console.log("FP does not allows geolocation.")
+}
 
         function startWatch(){
             if (navigator.geolocation)
