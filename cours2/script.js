@@ -21,6 +21,12 @@ function getLocation() {
             latitude = position.coords.latitude;
             longitude = position.coords.longitude;
             map.setView([latitude, longitude]);
+		var circle = L.circle([latitude, longitude], {
+		    color: 'red',
+		    fillColor: '#f03',
+		    fillOpacity: 0.5,
+		    radius: position.coords.accuracy
+		}).addTo(map);
         });
   } else {
     x.innerHTML = "Geolocation is not supported by this browser.";
