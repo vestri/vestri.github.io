@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="fr">
+<head>
+	<meta charset="utf-8">
+	<link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css"
+	integrity="sha512-xodZBNTC5n17Xt2atTPuE1HxjVMSvLVW9ocqUKLsCC5CXdbqCmblAshOMAS6/keqq/sMZMZ19scR4PsZChSR7A=="
+	crossorigin=""/>
+	<script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"
+	integrity="sha512-XQoYMqMTK8LvdxXYG3nZ448hOEQiglfqkJs1NOQV44cWnUrBc8PkAOcXy20w0vlaXaVUearIOBhiXZ5V3ynxwA=="
+	crossorigin=""></script>
+	<script src="https://code.jquery.com/jquery-3.5.1.min.js "></script>
+	<title>TP2 | Leaflet</title>
+	<style>
+		body
+		{
+			color: white;
+			background-color : black;
+		}
+
+		p
+		{
+			text-align: center;
+		}
+
+		#mapid 
+		{
+			height: 800px;
+		}
+	</style>
+</head>
+<body>
+	<div id="mapid"></div>
+	<p>Longitude: <b id="longitude"></b><br> Latitude: <b id="latitude"></b></p>
+	<p>Distance de Marseille : <b id="distance"></b> m<br><strong>Ouvrir la console pour voir les données GeoJson</strong></p>
+	<script>
+		var latitude;
+		var longitude;
+		var acurracy;
+		var map = new L.Map("mapid", {
+			center: new L.LatLng(0, 0),
+			zoom: 9
+		});
+		function maPosition(position) 
+		{
+			latitude = position.coords.latitude;
+			longitude = position.coords.longitude;
+			acurracy = position.coords.accuracy;
+			map.setView(new L.LatLng(latitude, longitude), 8);
+			var circle = L.circle([latitude, longitude], {
+				color: 'red',
+				radius: acurracy
+			}).addTo(map).bindPopup("Vous êtes approximativement à " + acurracy + " mètres de ce point").openPopup();
+			var latlngMarseille = L.latLng(43.3, 5.4);
+			var latlngCurrentPosition = L.latLng(latitude, longitude);
+			document.getElementById("longitude").innerHTML = longitude;
+			document.getElementById("latitude").innerHTML = latitude;
+			document.getElementById("distance").innerHTML = latlngMarseille.distanceTo(latlngCurrentPosition);
+		}
+
+		if(navigator.geolocation)
+			navigator.geolocation.getCurrentPosition(maPosition);
+
+		L.tileLayer('https://tiles.stadiamaps.com/tiles/stamen_toner/{z}/{x}/{y}{r}.png', {
+			attribution: 'Map tiles by <a href="http://stamen.com">Stamen Design</a>, <a href="http://creativecommons.org/licenses/by/3.0">CC BY 3.0</a> &mdash; Map data &copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+			minZoom: 1,
+			maxZoom: 20,
+			ext: 'png'
+		}).addTo(map);
+
+
+		L.marker([43.7102, 7.2620]).addTo(map).bindPopup('Marqueur sur Nice');
+		var polygon = L.polygon([
+			[32.259265, -64.857788],
+			[25.777634, -80.183716],
+			[18.448347, -66.104736]
+		],{ color: 'red', fillColor: '#f03'}).addTo(map).bindPopup('Triangle des Bermudes');
+
+		var greenIcon = new L.Icon({
+			iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-green.png',
+			shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
+			iconSize: [25, 41],
+			iconAnchor: [12, 41],
+			popupAnchor: [1, -34],
+			shadowSize: [41, 41]
+		});			
+
+		var redIcon = new L.Icon({
+			iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-red.png',
+			shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
+			iconSize: [25, 41],
+			iconAnchor: [12, 41],
+			popupAnchor: [1, -34],
+			shadowSize: [41, 41]
+		});			
+			const url1="https://api-adresse.data.gouv.fr/search/?q=grasse&type=street";  // 
+			const url2="https://geo.api.gouv.fr/departements/06/communes?fields=code,nom,centre";
+			const url3="wifi-public2023.geojson";
+			const url4="ev-inventaire-opendata-2023.geojson";
+
+			$.getJSON(url1, function(result)
+			{
+				var data = result.features;
+				console.log(data)
+
+				data.forEach(element => {
+					L.marker([element.geometry.coordinates[1], element.geometry.coordinates[0]],{icon: greenIcon}).addTo(map)
+					.bindPopup(element.properties.label);
+				});
+			});
+
+			$.getJSON(url2, function(result)
+			{
+				var data = result;
+				console.log(data)
+
+				data.forEach(element => {
+					L.marker([element.centre.coordinates[1], element.centre.coordinates[0]]).addTo(map)
+					.bindPopup(element.nom);
+				});
+			});
+
+			$.getJSON(url3, function(result)
+				{L.geoJSON(result, {pointToLayer: function(feature, latlng){return L.marker(latlng,{icon: redIcon});}}).bindPopup(function (layer) {
+					return layer.feature.properties.Service_ut;
+				}).addTo(map);});
+	</script>
+</body>
+</html>
