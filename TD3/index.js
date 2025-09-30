@@ -88,7 +88,8 @@ function main() {
 
     function render(time) {
         resizeUpdate();
-        if(orientationControls) orientationControls.update();
+        if(orientationControls)
+         orientationControls.update();
         cam.update();
         renderer.render(scene, camera);
         requestAnimationFrame(render);
