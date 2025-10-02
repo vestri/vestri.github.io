@@ -2,7 +2,7 @@
 <html>
 <head>
     <meta charset="UTF-8">
-    <title>Babylon.js - AR Géolocalisée (Stable)</title>
+    <title>Babylon.js - AR Géolocalisée (Correction Finale)</title>
     <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
     <style>
         html, body { overflow: hidden; width: 100%; height: 100%; margin: 0; padding: 0; }
@@ -21,8 +21,8 @@
         const infoDiv = document.getElementById('info');
 
         // --- Paramètres de la scène ---
-        const distance = 30;
-        const cubeSize = 3;
+        const distance = 10;
+        const cubeSize = 1;
         const smoothingFactor = 0.05;
 
         // Variables pour le lissage de l'orientation
@@ -34,7 +34,7 @@
             const light = new BABYLON.HemisphericLight("light", new BABYLON.Vector3(0, 1, 0), scene);
             const camera = new BABYLON.FreeCamera("camera", new BABYLON.Vector3(0, 0, 0), scene);
             
-            // Placement fixe des cubes dans l'espace 3D
+            // Placement fixe des cubes
             const cubeNorth = BABYLON.MeshBuilder.CreateBox("Nord", { size: cubeSize }, scene);
             cubeNorth.position = new BABYLON.Vector3(0, 0, distance);
             cubeNorth.material = new BABYLON.StandardMaterial("matN", scene);
@@ -80,14 +80,15 @@
         const setupOrientationListener = () => {
             window.addEventListener("deviceorientationabsolute", (event) => {
                 if (event.alpha !== null) {
-                    // --- CORRECTION POUR LE MODE PAYSAGE ---
-                    // On récupère l'orientation de l'écran (0, 90, -90)
-                    const screenOrientation = window.orientation || 0;
-                    // On compense l'alpha avec l'orientation de l'écran pour un cap stable
-                    const compensatedAlpha = event.alpha + screenOrientation;
+                    // --- CORRECTION FINALE AVEC L'API MODERNE ---
+                    // screen.orientation.angle donne 0°, 90°, 180°, 270°
+                    const screenAngle = screen.orientation.angle || 0;
+                    
+                    // On soustrait l'angle de l'écran pour obtenir le vrai cap
+                    const compensatedAlpha = event.alpha - screenAngle;
 
                     targetAngleY = -compensatedAlpha;
-                    infoDiv.textContent = `Cap: ${compensatedAlpha.toFixed(1) % 360}°`;
+                    infoDiv.textContent = `Cap: ${(compensatedAlpha % 360).toFixed(1)}°`;
                 }
             }, true);
         };
@@ -96,10 +97,9 @@
         
         engine.runRenderLoop(() => {
             let delta = targetAngleY - smoothedAngleY;
-            if (delta > 180) {
-                delta -= 360;
-            } else if (delta < -180) {
-                delta += 360;
+            // Gère le passage de 360° à 0°
+            if (Math.abs(delta) > 180) {
+                delta -= Math.sign(delta) * 360;
             }
             
             smoothedAngleY += delta * smoothingFactor;
