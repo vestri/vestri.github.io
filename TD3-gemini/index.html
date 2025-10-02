@@ -2,7 +2,7 @@
 <html>
 <head>
     <meta charset="UTF-8">
-    <title>Babylon.js - AR Géolocalisée</title>
+    <title>Babylon.js - AR Géolocalisée (Stable)</title>
     <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
     <style>
         html, body { overflow: hidden; width: 100%; height: 100%; margin: 0; padding: 0; }
@@ -21,9 +21,9 @@
         const infoDiv = document.getElementById('info');
 
         // --- Paramètres de la scène ---
-        const distance = 50;      // Distance des cubes en mètres
-        const cubeSize = 3;       // Taille des cubes en mètres
-        const smoothingFactor = 0.05; // Facteur de lissage (plus petit = plus lisse)
+        const distance = 30;
+        const cubeSize = 3;
+        const smoothingFactor = 0.05;
 
         // Variables pour le lissage de l'orientation
         let targetAngleY = 0;
@@ -35,8 +35,6 @@
             const camera = new BABYLON.FreeCamera("camera", new BABYLON.Vector3(0, 0, 0), scene);
             
             // Placement fixe des cubes dans l'espace 3D
-            // En Babylon.js : +Z = Devant, +X = Droite
-            
             const cubeNorth = BABYLON.MeshBuilder.CreateBox("Nord", { size: cubeSize }, scene);
             cubeNorth.position = new BABYLON.Vector3(0, 0, distance);
             cubeNorth.material = new BABYLON.StandardMaterial("matN", scene);
@@ -64,8 +62,6 @@
         };
 
         const setupARBackground = (scene) => {
-            // Active la caméra de l'appareil en arrière-plan.
-            // **IMPORTANT : Nécessite une connexion HTTPS.**
             navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
                 .then(stream => {
                     const video = document.createElement('video');
@@ -84,10 +80,14 @@
         const setupOrientationListener = () => {
             window.addEventListener("deviceorientationabsolute", (event) => {
                 if (event.alpha !== null) {
-                    // Met à jour l'angle cible avec la valeur de la boussole.
-                    // La rotation est inversée pour correspondre au système de coordonnées de Babylon.js.
-                    targetAngleY = -event.alpha;
-                    infoDiv.textContent = `Cap: ${event.alpha.toFixed(1)}°`;
+                    // --- CORRECTION POUR LE MODE PAYSAGE ---
+                    // On récupère l'orientation de l'écran (0, 90, -90)
+                    const screenOrientation = window.orientation || 0;
+                    // On compense l'alpha avec l'orientation de l'écran pour un cap stable
+                    const compensatedAlpha = event.alpha + screenOrientation;
+
+                    targetAngleY = -compensatedAlpha;
+                    infoDiv.textContent = `Cap: ${compensatedAlpha.toFixed(1) % 360}°`;
                 }
             }, true);
         };
@@ -95,8 +95,6 @@
         const scene = createScene();
         
         engine.runRenderLoop(() => {
-            // Lissage de la rotation de la caméra à chaque image.
-            // Calcule le chemin le plus court pour la rotation (gère le passage de 359° à 1°).
             let delta = targetAngleY - smoothedAngleY;
             if (delta > 180) {
                 delta -= 360;
@@ -104,10 +102,8 @@
                 delta += 360;
             }
             
-            // Se rapproche de l'angle cible en utilisant le facteur de lissage.
             smoothedAngleY += delta * smoothingFactor;
             
-            // Applique l'angle lissé à la caméra.
             scene.activeCamera.rotation.y = BABYLON.Tools.ToRadians(smoothedAngleY);
             
             scene.render();
