@@ -1,128 +1,166 @@
 <!DOCTYPE html>
-<html lang="fr">
+<html>
 <head>
-    <title>Three.js - AR avec Géolocalisation Corrigée</title>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+    <meta charset="UTF-8">
+    <title>Babylon.js - Géolocalisation AR</title>
     <style>
-        body { margin: 0; overflow: hidden; }
-        #ar-view { position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
+        html, body {
+            overflow: hidden;
+            width: 100%;
+            height: 100%;
+            margin: 0;
+            padding: 0;
+        }
+        #renderCanvas {
+            width: 100%;
+            height: 100%;
+            touch-action: none;
+        }
+        #info {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            color: white;
+            background-color: rgba(0,0,0,0.5);
+            padding: 8px;
+            border-radius: 5px;
+            font-family: sans-serif;
+        }
     </style>
+    <script src="https://cdn.babylonjs.com/babylon.js"></script>
 </head>
 <body>
-    <div id="ar-view"></div>
-
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-    
-    <script src="https://threejs.org/examples/js/controls/DeviceOrientationControls.js"></script>
+    <div id="info">En attente des données GPS et de l'orientation...</div>
+    <canvas id="renderCanvas"></canvas>
 
     <script>
-        let scene, camera, renderer, controls;
-        let userPosition = null;
+        const canvas = document.getElementById('renderCanvas');
+        const engine = new BABYLON.Engine(canvas, true);
+        const infoDiv = document.getElementById('info');
 
-        function init() {
-            // 1. Création de la scène et de la caméra
-            scene = new THREE.Scene();
-            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-            
-            // 2. Création du renderer
-            renderer = new THREE.WebGLRenderer({ alpha: true });
-            renderer.setSize(window.innerWidth, window.innerHeight);
-            document.getElementById('ar-view').appendChild(renderer.domElement);
+        // Variables pour stocker les données des capteurs
+        let currentHeading = 0;
+        let userLatitude = null;
+        let userLongitude = null;
+        const cubes = [];
+        const distance = 10; // 10 mètres
 
-            // 3. Mise en place de la vue caméra du smartphone en arrière-plan
-            setupCameraFeed();
+        // Création de la scène
+        const createScene = async () => {
+            const scene = new BABYLON.Scene(engine);
 
-            // 4. Création des 4 cubes
-            createCubes();
-            
-            // 5. CORRECTION : Utilisation du contrôleur d'orientation de three.js
-            controls = new THREE.DeviceOrientationControls(camera);
+            // Caméra qui suit les mouvements du gyroscope
+            const camera = new BABYLON.DeviceOrientationCamera("DevOr_camera", new BABYLON.Vector3(0, 0, 0), scene);
+            camera.attachControl(canvas, true);
 
-            // 6. Récupération de la position GPS (inchangé)
-            if (navigator.geolocation) {
-                navigator.geolocation.watchPosition(handlePosition, handleError, { enableHighAccuracy: true });
-            } else {
-                alert("La géolocalisation n'est pas supportée par votre navigateur.");
+            // Lumière
+            const light = new BABYLON.HemisphericLight("light", new BABYLON.Vector3(0, 1, 0), scene);
+
+            // Créer les 4 cubes
+            const directions = {
+                "Nord": { color: [1, 0, 0], angle: 0 },       // Rouge
+                "Est":  { color: [0, 1, 0], angle: 90 },      // Vert
+                "Sud":  { color: [0, 0, 1], angle: 180 },     // Bleu
+                "Ouest":{ color: [1, 1, 0], angle: 270 }      // Jaune
+            };
+
+            for (const [name, props] of Object.entries(directions)) {
+                const cube = BABYLON.MeshBuilder.CreateBox(name, { size: 1 }, scene);
+                const material = new BABYLON.StandardMaterial(`${name}_mat`, scene);
+                material.diffuseColor = new BABYLON.Color3(props.color[0], props.color[1], props.color[2]);
+                material.emissiveColor = new BABYLON.Color3(props.color[0], props.color[1], props.color[2]); // Pour être bien visible
+                cube.material = material;
+                cubes.push({ mesh: cube, angle: props.angle });
             }
 
-            animate();
-        }
+            // Mettre la caméra en fond de scène (Réalité Augmentée)
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+                const video = document.createElement('video');
+                video.setAttribute('playsinline', '');
+                video.setAttribute('autoplay', '');
+                video.setAttribute('muted', 'true');
+                video.srcObject = stream;
+                video.play();
+                
+                const background = new BABYLON.Layer("background", null, scene);
+                background.texture = new BABYLON.VideoTexture("video", video, scene, true);
+                background.isBackground = true;
+                // Ajuste la texture pour remplir l'écran sans déformation
+                const aspectRatio = video.videoWidth / video.videoHeight;
+                const screenAspectRatio = engine.getRenderWidth() / engine.getRenderHeight();
+                if (aspectRatio > screenAspectRatio) {
+                    background.texture.uScale = screenAspectRatio / aspectRatio;
+                    background.texture.uOffset = (1 - background.texture.uScale) / 2;
+                } else {
+                    background.texture.vScale = aspectRatio / screenAspectRatio;
+                     background.texture.vOffset = (1 - background.texture.vScale) / 2;
+                }
 
-        function setupCameraFeed() {
-            const video = document.createElement('video');
-            video.setAttribute('autoplay', '');
-            video.setAttribute('playsinline', '');
-            document.body.appendChild(video);
-
-            if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-                navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
-                    .then(stream => {
-                        video.srcObject = stream;
-                        video.play();
-                        const texture = new THREE.VideoTexture(video);
-                        scene.background = texture;
-                    })
-                    .catch(e => { console.error("Erreur d'accès à la caméra: ", e); });
+            } catch (err) {
+                console.error("Erreur d'accès à la caméra: ", err);
+                infoDiv.textContent = "Erreur: Impossible d'accéder à la caméra.";
             }
-        }
 
-        function createCubes() {
-            const geometry = new THREE.BoxGeometry(1, 1, 1);
-            const materials = [
-                new THREE.MeshBasicMaterial({ color: 0xff0000, name: 'Est' }),
-                new THREE.MeshBasicMaterial({ color: 0x00ff00, name: 'Sud' }),
-                new THREE.MeshBasicMaterial({ color: 0x0000ff, name: 'Ouest' }),
-                new THREE.MeshBasicMaterial({ color: 0xffff00, name: 'Nord' })
-            ];
+            return scene;
+        };
 
-            const positions = [
-                { x: 10,  y: 0, z: 0 },    // Est
-                { x: 0,   y: 0, z: 10 },   // Sud (z positif)
-                { x: -10, y: 0, z: 0 },   // Ouest
-                { x: 0,   y: 0, z: -10 }  // Nord (z négatif)
-            ];
+        // Fonction pour mettre à jour la position des cubes
+        const updateCubePositions = () => {
+            if (cubes.length === 0) return;
 
-            for (let i = 0; i < 4; i++) {
-                const cube = new THREE.Mesh(geometry, materials[i]);
-                // On place le cube au niveau des yeux (Y=0)
-                cube.position.set(positions[i].x, 0, positions[i].z);
-                scene.add(cube);
-            }
-        }
-        
-        // La fonction 'handleOrientation' manuelle a été supprimée.
+            infoDiv.textContent = `Cap: ${currentHeading.toFixed(2)}°`;
 
-        function handlePosition(position) {
-            if (userPosition === null) {
-                console.log('Position initiale:', position.coords.latitude, position.coords.longitude);
-                userPosition = {
-                    lat: position.coords.latitude,
-                    lon: position.coords.longitude
-                };
-            }
-        }
+            cubes.forEach(item => {
+                // Angle du cube par rapport à la direction actuelle de l'appareil
+                const angleRad = BABYLON.Tools.ToRadians(item.angle - currentHeading);
 
-        function handleError(error) {
-            console.error("Erreur de géolocalisation: ", error.message);
-        }
+                // Calculer la position en utilisant la trigonométrie
+                const x = distance * Math.sin(angleRad);
+                const z = distance * Math.cos(angleRad);
+                
+                // On garde les cubes au niveau de la caméra (sur le plan horizontal)
+                item.mesh.position.set(x, 0, z);
+            });
+        };
 
-        function animate() {
-            requestAnimationFrame(animate);
-            
-            // CORRECTION : Mettre à jour le contrôleur à chaque image
-            controls.update();
+        // Démarrer la scène et les capteurs
+        (async () => {
+            const scene = await createScene();
 
-            renderer.render(scene, camera);
-        }
+            // Écouter les changements d'orientation
+            window.addEventListener("deviceorientation", (event) => {
+                // webkitCompassHeading est pour iOS, alpha est pour Android.
+                let heading = event.webkitCompassHeading || (360 - event.alpha);
+                
+                if (heading !== null && heading !== undefined) {
+                    currentHeading = heading;
+                    updateCubePositions();
+                }
+            });
 
-        window.addEventListener('resize', () => {
-            camera.aspect = window.innerWidth / window.innerHeight;
-            camera.updateProjectionMatrix();
-            renderer.setSize(window.innerWidth, window.innerHeight);
-        });
+            // Récupérer la position GPS (optionnel ici mais nécessaire pour une vraie AR géolocalisée)
+             navigator.geolocation.watchPosition(
+                (position) => {
+                    userLatitude = position.coords.latitude;
+                    userLongitude = position.coords.longitude;
+                    console.log(`Position GPS: ${userLatitude}, ${userLongitude}`);
+                },
+                (error) => {
+                    console.error("Erreur de géolocalisation: ", error);
+                    infoDiv.textContent = "Erreur: Activez le GPS.";
+                },
+                { enableHighAccuracy: true }
+            );
 
-        init();
+            engine.runRenderLoop(() => {
+                scene.render();
+            });
+
+            window.addEventListener('resize', () => {
+                engine.resize();
+            });
+        })();
     </script>
 </body>
 </html>
