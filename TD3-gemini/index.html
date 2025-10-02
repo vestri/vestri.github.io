@@ -2,7 +2,8 @@
 <html>
 <head>
     <meta charset="UTF-8">
-    <title>Babylon.js - AR Géolocalisée</title>
+    <title>Babylon.js - AR Géolocalisée (Corrigé)</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
     <style>
         html, body {
             overflow: hidden;
@@ -18,7 +19,7 @@
         }
         #info {
             position: absolute;
-            top: 10px;
+            bottom: 10px;
             left: 10px;
             color: white;
             background-color: rgba(0,0,0,0.7);
@@ -31,114 +32,99 @@
     <script src="https://cdn.babylonjs.com/babylon.js"></script>
 </head>
 <body>
-    <div id="info">Initialisation... Pointez vers le Nord.</div>
+    <div id="info">Attente des permissions...</div>
     <canvas id="renderCanvas"></canvas>
 
     <script>
         const canvas = document.getElementById('renderCanvas');
         const engine = new BABYLON.Engine(canvas, true);
         const infoDiv = document.getElementById('info');
-
-        let currentHeading = 0;
-        const cubes = [];
         const distance = 10; // 10 mètres
 
         const createScene = () => {
             const scene = new BABYLON.Scene(engine);
             const light = new BABYLON.HemisphericLight("light", new BABYLON.Vector3(0, 1, 0), scene);
 
-            // 1. UTILISATION DE LA DeviceOrientationCamera
-            // Cette caméra utilise les capteurs de l'appareil pour contrôler le point de vue.
-            // C'est ce qui vous permet de "regarder autour de vous" dans la scène 3D.
-            const camera = new BABYLON.DeviceOrientationCamera("DevOr_camera", new BABYLON.Vector3(0, 0, 0), scene);
-            camera.attachControl(canvas, true);
-            // On baisse la sensibilité pour des mouvements plus fluides
-            camera.angularSensibility = 1000;
+            // On utilise une caméra simple, car on va contrôler sa rotation manuellement.
+            const camera = new BABYLON.FreeCamera("camera", new BABYLON.Vector3(0, 0, 0), scene);
+            
+            // --- PLACEMENT FIXE DES CUBES ---
+            // On place les cubes à des coordonnées cardinales dans la scène. Ils ne bougeront plus.
+            // En Babylon.js : +Z = Devant, +X = Droite
+            
+            // Cube NORD (devant)
+            const cubeNorth = BABYLON.MeshBuilder.CreateBox("Nord", { size: 1 }, scene);
+            cubeNorth.position = new BABYLON.Vector3(0, 0, distance);
+            cubeNorth.material = new BABYLON.StandardMaterial("matN", scene);
+            cubeNorth.material.emissiveColor = BABYLON.Color3.Red();
 
+            // Cube EST (à droite)
+            const cubeEast = BABYLON.MeshBuilder.CreateBox("Est", { size: 1 }, scene);
+            cubeEast.position = new BABYLON.Vector3(distance, 0, 0);
+            cubeEast.material = new BABYLON.StandardMaterial("matE", scene);
+            cubeEast.material.emissiveColor = BABYLON.Color3.Green();
 
-            // 2. CRÉATION DU FOND VIDÉO (LA PARTIE AR)
-            // Ceci est indépendant de la caméra Babylon.js. On utilise l'API du navigateur
-            // pour récupérer le flux vidéo et l'afficher en fond de la scène.
-            // **IMPORTANT : CELA NE FONCTIONNE QUE SUR UNE PAGE HTTPS !**
-            const videoPromise = navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
-                .then(stream => {
-                    const video = document.createElement('video');
-                    video.setAttribute('playsinline', '');
-                    video.setAttribute('autoplay', '');
-                    video.setAttribute('muted', 'true');
-                    video.srcObject = stream;
-                    video.play();
+            // Cube SUD (derrière)
+            const cubeSouth = BABYLON.MeshBuilder.CreateBox("Sud", { size: 1 }, scene);
+            cubeSouth.position = new BABYLON.Vector3(0, 0, -distance);
+            cubeSouth.material = new BABYLON.StandardMaterial("matS", scene);
+            cubeSouth.material.emissiveColor = BABYLON.Color3.Blue();
 
-                    const background = new BABYLON.Layer("background", null, scene, true);
-                    background.texture = new BABYLON.VideoTexture("video", video, scene, true);
-                    background.texture.level = 0;
-                    background.isBackground = true;
-                    infoDiv.textContent = "Caméra activée. Attente des capteurs...";
-                }).catch(err => {
-                    console.error("Erreur d'accès à la caméra : ", err);
-                    infoDiv.innerHTML = "<strong>Erreur:</strong> Impossible d'accéder à la caméra.<br>Assurez-vous d'être sur une page <strong>HTTPS</strong> et d'avoir donné la permission.";
-                });
+            // Cube OUEST (à gauche)
+            const cubeWest = BABYLON.MeshBuilder.CreateBox("Ouest", { size: 1 }, scene);
+            cubeWest.position = new BABYLON.Vector3(-distance, 0, 0);
+            cubeWest.material = new BABYLON.StandardMaterial("matW", scene);
+            cubeWest.material.emissiveColor = BABYLON.Color3.Yellow();
 
-            // Création des 4 cubes
-            const directions = {
-                "Nord": { color: new BABYLON.Color3(1, 0, 0), angle: 0 },
-                "Est":  { color: new BABYLON.Color3(0, 1, 0), angle: 90 },
-                "Sud":  { color: new BABYLON.Color3(0, 0, 1), angle: 180 },
-                "Ouest":{ color: new BABYLON.Color3(1, 1, 0), angle: 270 }
-            };
+            // Démarrer le fond vidéo (AR)
+            setupARBackground(scene);
 
-            for (const [name, props] of Object.entries(directions)) {
-                const cube = BABYLON.MeshBuilder.CreateBox(name, { size: 1 }, scene);
-                const material = new BABYLON.StandardMaterial(`${name}_mat`, scene);
-                material.emissiveColor = props.color; // emissiveColor est visible même sans lumière directe
-                cube.material = material;
-                cubes.push({ mesh: cube, angle: props.angle });
-            }
+            // Lier la rotation de la caméra à la boussole du téléphone
+            setupOrientationListener(camera);
 
             return scene;
         };
 
-        const scene = createScene();
-
-        // Fonction pour mettre à jour la position des cubes en fonction de l'orientation
-        const updateCubePositions = (heading) => {
-            if (cubes.length === 0) return;
-
-            infoDiv.textContent = `Cap: ${heading.toFixed(1)}° (Nord)`;
-
-            cubes.forEach(item => {
-                // Calcule l'angle du cube relatif à la direction actuelle du téléphone
-                const angleRad = BABYLON.Tools.ToRadians(item.angle - heading);
-
-                // Calcule les coordonnées x et z avec la trigonométrie
-                const x = distance * Math.sin(angleRad);
-                const z = distance * Math.cos(angleRad);
-                
-                // Positionne le cube
-                item.mesh.position.set(x, 0, z);
-            });
+        const setupARBackground = (scene) => {
+            // Cette fonction active la caméra de l'appareil en arrière-plan.
+            // **IMPORTANT : DOIT ÊTRE SERVI VIA HTTPS**
+            navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
+                .then(stream => {
+                    const video = document.createElement('video');
+                    video.setAttribute('playsinline', '');
+                    video.setAttribute('autoplay', '');
+                    video.srcObject = stream;
+                    video.play();
+                    
+                    const background = new BABYLON.Layer("background", null, scene, true);
+                    background.texture = new BABYLON.VideoTexture("video", video, scene, true);
+                }).catch(err => {
+                    infoDiv.innerHTML = "<strong>Erreur:</strong> Caméra inaccessible. Assurez-vous d'utiliser <strong>HTTPS</strong> et d'accorder la permission.";
+                });
         };
 
-        // Écouteur pour les capteurs d'orientation
-        window.addEventListener("deviceorientationabsolute", (event) => {
-            // 'alpha' est la direction en degrés (0=Nord, 90=Est, 180=Sud, 270=Ouest)
-            // 'deviceorientationabsolute' est préférable car il utilise le magnétomètre
-            // pour donner une orientation stable par rapport à la Terre.
-            if (event.alpha !== null) {
-                // On inverse l'alpha pour correspondre au système de coordonnées
-                currentHeading = 360 - event.alpha;
-                updateCubePositions(currentHeading);
-            }
-        }, true);
+        const setupOrientationListener = (camera) => {
+            window.addEventListener("deviceorientationabsolute", (event) => {
+                // event.alpha donne la direction de la boussole : 0 = Nord, 90 = Est, etc. (rotation horaire)
+                if (event.alpha !== null) {
+                    // La rotation en Babylon.js est anti-horaire. On utilise donc l'inverse de alpha.
+                    const heading = -event.alpha;
+                    
+                    camera.rotation.y = BABYLON.Tools.ToRadians(heading);
+                    infoDiv.textContent = `Cap: ${event.alpha.toFixed(1)}°`;
+                }
+            }, true);
+        };
 
-
+        // Lancement de la scène
+        const scene = createScene();
         engine.runRenderLoop(() => {
             scene.render();
         });
-
         window.addEventListener('resize', () => {
             engine.resize();
         });
+
     </script>
 </body>
 </html>
