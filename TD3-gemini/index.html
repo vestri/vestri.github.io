@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="fr">
 <head>
-    <title>Three.js - AR avec Géolocalisation</title>
+    <title>Three.js - AR avec Géolocalisation Corrigée</title>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
     <style>
@@ -13,18 +13,20 @@
     <div id="ar-view"></div>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    
+    <script src="https://threejs.org/examples/js/controls/DeviceOrientationControls.js"></script>
+
     <script>
-        let scene, camera, renderer;
-        let userPosition = null; // Position GPS de l'utilisateur
-        const cubes = [];
+        let scene, camera, renderer, controls;
+        let userPosition = null;
 
         function init() {
             // 1. Création de la scène et de la caméra
             scene = new THREE.Scene();
             camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
             
-            // 2. Création du renderer et association à la vue
-            renderer = new THREE.WebGLRenderer({ alpha: true }); // alpha:true pour un fond transparent
+            // 2. Création du renderer
+            renderer = new THREE.WebGLRenderer({ alpha: true });
             renderer.setSize(window.innerWidth, window.innerHeight);
             document.getElementById('ar-view').appendChild(renderer.domElement);
 
@@ -34,10 +36,10 @@
             // 4. Création des 4 cubes
             createCubes();
             
-            // 5. Suivi de l'orientation de l'appareil
-            window.addEventListener('deviceorientation', handleOrientation, true);
+            // 5. CORRECTION : Utilisation du contrôleur d'orientation de three.js
+            controls = new THREE.DeviceOrientationControls(camera);
 
-            // 6. Récupération de la position GPS
+            // 6. Récupération de la position GPS (inchangé)
             if (navigator.geolocation) {
                 navigator.geolocation.watchPosition(handlePosition, handleError, { enableHighAccuracy: true });
             } else {
@@ -50,7 +52,7 @@
         function setupCameraFeed() {
             const video = document.createElement('video');
             video.setAttribute('autoplay', '');
-            video.setAttribute('playsinline', ''); // Nécessaire pour iOS
+            video.setAttribute('playsinline', '');
             document.body.appendChild(video);
 
             if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
@@ -58,7 +60,6 @@
                     .then(stream => {
                         video.srcObject = stream;
                         video.play();
-                        // Appliquer la vidéo comme texture de fond de la scène
                         const texture = new THREE.VideoTexture(video);
                         scene.background = texture;
                     })
@@ -67,48 +68,32 @@
         }
 
         function createCubes() {
-            const geometry = new THREE.BoxGeometry(1, 1, 1); // Cube de 1m x 1m x 1m
+            const geometry = new THREE.BoxGeometry(1, 1, 1);
             const materials = [
-                new THREE.MeshBasicMaterial({ color: 0xff0000 }), // Est (Rouge)
-                new THREE.MeshBasicMaterial({ color: 0x00ff00 }), // Sud (Vert)
-                new THREE.MeshBasicMaterial({ color: 0x0000ff }), // Ouest (Bleu)
-                new THREE.MeshBasicMaterial({ color: 0xffff00 })  // Nord (Jaune)
+                new THREE.MeshBasicMaterial({ color: 0xff0000, name: 'Est' }),
+                new THREE.MeshBasicMaterial({ color: 0x00ff00, name: 'Sud' }),
+                new THREE.MeshBasicMaterial({ color: 0x0000ff, name: 'Ouest' }),
+                new THREE.MeshBasicMaterial({ color: 0xffff00, name: 'Nord' })
             ];
 
-            // Positions relatives (x, y, z) par rapport à l'utilisateur
-            // Axe X = Est, Axe Z = Nord
             const positions = [
                 { x: 10,  y: 0, z: 0 },    // Est
-                { x: 0,   y: 0, z: 10 },    // Sud (attention z est inversé en three.js, donc positif)
-                { x: -10, y: 0, z: 0 },    // Ouest
-                { x: 0,   y: 0, z: -10 }     // Nord
+                { x: 0,   y: 0, z: 10 },   // Sud (z positif)
+                { x: -10, y: 0, z: 0 },   // Ouest
+                { x: 0,   y: 0, z: -10 }  // Nord (z négatif)
             ];
 
             for (let i = 0; i < 4; i++) {
                 const cube = new THREE.Mesh(geometry, materials[i]);
-                cube.position.set(positions[i].x, positions[i].y, positions[i].z);
-                cubes.push(cube);
+                // On place le cube au niveau des yeux (Y=0)
+                cube.position.set(positions[i].x, 0, positions[i].z);
                 scene.add(cube);
             }
         }
-
-        function handleOrientation(event) {
-            // L'API DeviceOrientationEvent fournit alpha, beta, gamma en degrés.
-            // Three.js utilise les quaternions pour éviter le "gimbal lock".
-            const alpha = event.alpha ? THREE.MathUtils.degToRad(event.alpha) : 0; // Z
-            const beta = event.beta ? THREE.MathUtils.degToRad(event.beta) : 0;   // X
-            const gamma = event.gamma ? THREE.MathUtils.degToRad(event.gamma) : 0; // Y
-            
-            // L'ordre d'Euler est important, 'YXZ' est courant pour les appareils mobiles.
-            const euler = new THREE.Euler(beta, alpha, -gamma, 'YXZ');
-            camera.quaternion.setFromEuler(euler);
-        }
         
+        // La fonction 'handleOrientation' manuelle a été supprimée.
+
         function handlePosition(position) {
-            // Pour cet exemple simple, nous plaçons les cubes une seule fois
-            // et ne les mettons pas à jour continuellement par rapport au GPS.
-            // Dans une vraie application, il faudrait recalculer leurs positions relatives
-            // si l'utilisateur se déplace de manière significative.
             if (userPosition === null) {
                 console.log('Position initiale:', position.coords.latitude, position.coords.longitude);
                 userPosition = {
@@ -124,6 +109,10 @@
 
         function animate() {
             requestAnimationFrame(animate);
+            
+            // CORRECTION : Mettre à jour le contrôleur à chaque image
+            controls.update();
+
             renderer.render(scene, camera);
         }
 
