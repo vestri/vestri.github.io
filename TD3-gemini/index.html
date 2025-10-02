@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <title>Three.js - AR avec Géolocalisation</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+    <style>
+        body { margin: 0; overflow: hidden; }
+        #ar-view { position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
+    </style>
+</head>
+<body>
+    <div id="ar-view"></div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script>
+        let scene, camera, renderer;
+        let userPosition = null; // Position GPS de l'utilisateur
+        const cubes = [];
+
+        function init() {
+            // 1. Création de la scène et de la caméra
+            scene = new THREE.Scene();
+            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+            
+            // 2. Création du renderer et association à la vue
+            renderer = new THREE.WebGLRenderer({ alpha: true }); // alpha:true pour un fond transparent
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            document.getElementById('ar-view').appendChild(renderer.domElement);
+
+            // 3. Mise en place de la vue caméra du smartphone en arrière-plan
+            setupCameraFeed();
+
+            // 4. Création des 4 cubes
+            createCubes();
+            
+            // 5. Suivi de l'orientation de l'appareil
+            window.addEventListener('deviceorientation', handleOrientation, true);
+
+            // 6. Récupération de la position GPS
+            if (navigator.geolocation) {
+                navigator.geolocation.watchPosition(handlePosition, handleError, { enableHighAccuracy: true });
+            } else {
+                alert("La géolocalisation n'est pas supportée par votre navigateur.");
+            }
+
+            animate();
+        }
+
+        function setupCameraFeed() {
+            const video = document.createElement('video');
+            video.setAttribute('autoplay', '');
+            video.setAttribute('playsinline', ''); // Nécessaire pour iOS
+            document.body.appendChild(video);
+
+            if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+                navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
+                    .then(stream => {
+                        video.srcObject = stream;
+                        video.play();
+                        // Appliquer la vidéo comme texture de fond de la scène
+                        const texture = new THREE.VideoTexture(video);
+                        scene.background = texture;
+                    })
+                    .catch(e => { console.error("Erreur d'accès à la caméra: ", e); });
+            }
+        }
+
+        function createCubes() {
+            const geometry = new THREE.BoxGeometry(1, 1, 1); // Cube de 1m x 1m x 1m
+            const materials = [
+                new THREE.MeshBasicMaterial({ color: 0xff0000 }), // Est (Rouge)
+                new THREE.MeshBasicMaterial({ color: 0x00ff00 }), // Sud (Vert)
+                new THREE.MeshBasicMaterial({ color: 0x0000ff }), // Ouest (Bleu)
+                new THREE.MeshBasicMaterial({ color: 0xffff00 })  // Nord (Jaune)
+            ];
+
+            // Positions relatives (x, y, z) par rapport à l'utilisateur
+            // Axe X = Est, Axe Z = Nord
+            const positions = [
+                { x: 10,  y: 0, z: 0 },    // Est
+                { x: 0,   y: 0, z: 10 },    // Sud (attention z est inversé en three.js, donc positif)
+                { x: -10, y: 0, z: 0 },    // Ouest
+                { x: 0,   y: 0, z: -10 }     // Nord
+            ];
+
+            for (let i = 0; i < 4; i++) {
+                const cube = new THREE.Mesh(geometry, materials[i]);
+                cube.position.set(positions[i].x, positions[i].y, positions[i].z);
+                cubes.push(cube);
+                scene.add(cube);
+            }
+        }
+
+        function handleOrientation(event) {
+            // L'API DeviceOrientationEvent fournit alpha, beta, gamma en degrés.
+            // Three.js utilise les quaternions pour éviter le "gimbal lock".
+            const alpha = event.alpha ? THREE.MathUtils.degToRad(event.alpha) : 0; // Z
+            const beta = event.beta ? THREE.MathUtils.degToRad(event.beta) : 0;   // X
+            const gamma = event.gamma ? THREE.MathUtils.degToRad(event.gamma) : 0; // Y
+            
+            // L'ordre d'Euler est important, 'YXZ' est courant pour les appareils mobiles.
+            const euler = new THREE.Euler(beta, alpha, -gamma, 'YXZ');
+            camera.quaternion.setFromEuler(euler);
+        }
+        
+        function handlePosition(position) {
+            // Pour cet exemple simple, nous plaçons les cubes une seule fois
+            // et ne les mettons pas à jour continuellement par rapport au GPS.
+            // Dans une vraie application, il faudrait recalculer leurs positions relatives
+            // si l'utilisateur se déplace de manière significative.
+            if (userPosition === null) {
+                console.log('Position initiale:', position.coords.latitude, position.coords.longitude);
+                userPosition = {
+                    lat: position.coords.latitude,
+                    lon: position.coords.longitude
+                };
+            }
+        }
+
+        function handleError(error) {
+            console.error("Erreur de géolocalisation: ", error.message);
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            renderer.render(scene, camera);
+        }
+
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        init();
+    </script>
+</body>
+</html>
