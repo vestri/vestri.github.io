@@ -39,7 +39,8 @@
         const canvas = document.getElementById('renderCanvas');
         const engine = new BABYLON.Engine(canvas, true);
         const infoDiv = document.getElementById('info');
-        const distance = 10; // 10 mètres
+        const distance = 30; // 10 mètres
+        const width = 3; // 10 mètres
 
         const createScene = () => {
             const scene = new BABYLON.Scene(engine);
@@ -53,25 +54,25 @@
             // En Babylon.js : +Z = Devant, +X = Droite
             
             // Cube NORD (devant)
-            const cubeNorth = BABYLON.MeshBuilder.CreateBox("Nord", { size: 1 }, scene);
+            const cubeNorth = BABYLON.MeshBuilder.CreateBox("Nord", { size: width }, scene);
             cubeNorth.position = new BABYLON.Vector3(0, 0, distance);
             cubeNorth.material = new BABYLON.StandardMaterial("matN", scene);
             cubeNorth.material.emissiveColor = BABYLON.Color3.Red();
 
             // Cube EST (à droite)
-            const cubeEast = BABYLON.MeshBuilder.CreateBox("Est", { size: 1 }, scene);
+            const cubeEast = BABYLON.MeshBuilder.CreateBox("Est", { size: width }, scene);
             cubeEast.position = new BABYLON.Vector3(distance, 0, 0);
             cubeEast.material = new BABYLON.StandardMaterial("matE", scene);
             cubeEast.material.emissiveColor = BABYLON.Color3.Green();
 
             // Cube SUD (derrière)
-            const cubeSouth = BABYLON.MeshBuilder.CreateBox("Sud", { size: 1 }, scene);
+            const cubeSouth = BABYLON.MeshBuilder.CreateBox("Sud", { size: width }, scene);
             cubeSouth.position = new BABYLON.Vector3(0, 0, -distance);
             cubeSouth.material = new BABYLON.StandardMaterial("matS", scene);
             cubeSouth.material.emissiveColor = BABYLON.Color3.Blue();
 
             // Cube OUEST (à gauche)
-            const cubeWest = BABYLON.MeshBuilder.CreateBox("Ouest", { size: 1 }, scene);
+            const cubeWest = BABYLON.MeshBuilder.CreateBox("Ouest", { size: width*2 }, scene);
             cubeWest.position = new BABYLON.Vector3(-distance, 0, 0);
             cubeWest.material = new BABYLON.StandardMaterial("matW", scene);
             cubeWest.material.emissiveColor = BABYLON.Color3.Yellow();
